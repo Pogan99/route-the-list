@@ -25,6 +25,7 @@ export interface VisitRecord {
 
 // ---- localStorage visit store ----
 const VISITS_KEY = 'rtl_visits'
+const API_URL = import.meta.env.VITE_VISITS_API_URL as string | undefined
 
 function loadVisits(): Record<string, VisitRecord> {
   try {
@@ -38,10 +39,62 @@ function saveVisits(visits: Record<string, VisitRecord>) {
   localStorage.setItem(VISITS_KEY, JSON.stringify(visits))
 }
 
-export function markVisited(placeId: string, outcome?: Outcome, notes?: string) {
+/** Fire-and-forget sync to AWS. Does not block the caller. */
+function syncVisitToCloud(placeId: string, record: VisitRecord & { name?: string; category?: string }) {
+  if (!API_URL) return
+  const { placeId: _id, ...rest } = record
+  fetch(`${API_URL}/visits/${encodeURIComponent(placeId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rest),
+  }).catch(() => {/* silent — offline OK */})
+}
+
+/**
+ * Hydrate localStorage from AWS with visits from the last 30 days.
+ * Call once on app load. Does not overwrite newer local records.
+ */
+export async function hydrateFromCloud(): Promise<void> {
+  if (!API_URL) return
+  try {
+    const res = await fetch(`${API_URL}/visits`)
+    if (!res.ok) return
+    const items: Array<{
+      place_id: string
+      visit_date: string
+      visited_at?: string
+      outcome?: Outcome
+      notes?: string
+    }> = await res.json()
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const visits = loadVisits()
+    let changed = false
+    for (const item of items) {
+      const ts = item.visited_at ?? `${item.visit_date}T00:00:00.000Z`
+      if (new Date(ts).getTime() < cutoff) continue
+      // Only write if we have no local record for this place
+      if (!visits[item.place_id]) {
+        visits[item.place_id] = {
+          placeId: item.place_id,
+          visitedAt: ts,
+          outcome: item.outcome,
+          notes: item.notes,
+        }
+        changed = true
+      }
+    }
+    if (changed) saveVisits(visits)
+  } catch {
+    // offline — skip
+  }
+}
+
+export function markVisited(placeId: string, outcome?: Outcome, notes?: string, name?: string, category?: string) {
   const visits = loadVisits()
-  visits[placeId] = { placeId, visitedAt: new Date().toISOString(), outcome, notes }
+  const record: VisitRecord = { placeId, visitedAt: new Date().toISOString(), outcome, notes }
+  visits[placeId] = record
   saveVisits(visits)
+  syncVisitToCloud(placeId, { ...record, name, category })
 }
 
 export function getVisit(placeId: string): VisitRecord | undefined {

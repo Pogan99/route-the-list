@@ -4,7 +4,7 @@ import { FilterRail } from './components/FilterRail'
 import { ProspectMap } from './components/ProspectMap'
 import { ProspectDetail } from './components/ProspectDetail'
 import { RouteBuilder } from './components/RouteBuilder'
-import { useStore } from './lib/store'
+import { useStore, hydrateFromCloud } from './lib/store'
 import type { Prospect } from './types/prospect'
 
 export default function App() {
@@ -16,6 +16,7 @@ export default function App() {
       .then(r => r.json())
       .then((data: Prospect[]) => setProspects(data))
       .catch(err => console.error('Failed to load prospects:', err))
+    hydrateFromCloud()
   }, [setProspects])
 
   return (
