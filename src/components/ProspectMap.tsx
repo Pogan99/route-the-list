@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { useStore, useFilteredProspects } from '../lib/store'
 import { categoryColor } from '../lib/utils'
@@ -14,6 +14,7 @@ interface ProspectMapProps {
 export function ProspectMap({ mapRef }: ProspectMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
+  const [mapReady, setMapReady] = useState(false)
   const filtered = useFilteredProspects()
   const { setSelectedProspect, selectedProspect } = useStore()
 
@@ -21,7 +22,7 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
-    mapRef.current = new maplibregl.Map({
+    const map = new maplibregl.Map({
       container: mapContainer.current,
       style: {
         version: 8,
@@ -40,19 +41,22 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
       zoom: 11,
     })
 
-    mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
+    mapRef.current = map
+    map.addControl(new maplibregl.NavigationControl(), 'top-right')
+    map.once('load', () => setMapReady(true))
 
     return () => {
-      mapRef.current?.remove()
+      map.remove()
       mapRef.current = null
+      setMapReady(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update markers when filtered prospects change
+  // Update markers when filtered prospects or selection changes (only after map is ready)
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !mapReady) return
 
     // Remove existing markers
     markersRef.current.forEach(m => m.remove())
@@ -103,7 +107,7 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
 
       markersRef.current.push(marker)
     })
-  }, [filtered, selectedProspect, setSelectedProspect, mapRef])
+  }, [filtered, selectedProspect, setSelectedProspect, mapRef, mapReady])
 
   // Fly to selected prospect
   useEffect(() => {

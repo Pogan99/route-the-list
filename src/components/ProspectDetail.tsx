@@ -13,10 +13,24 @@ const TEMPLATE_URLS: Record<string, string> = {
   'Dentist':        'https://dentist-web-presence.pogan-93.workers.dev',
 }
 
-function getPreviewUrl(category: string, placeId: string): string {
-  const canonical = normalizeCategory(category)
+function encodeProspectForUrl(p: import('../types/prospect').Prospect): string {
+  const slim = {
+    place_id: p.place_id, name: p.name, category: p.category, subtypes: p.subtypes,
+    address: p.address, city: p.city, state: p.state, postal_code: p.postal_code,
+    lat: p.lat, lng: p.lng, phone: p.phone, email: p.email, website: p.website,
+    rating: p.rating, reviews: p.reviews, working_hours: p.working_hours,
+    photos: p.photos.slice(0, 2), logo: p.logo, description: p.description,
+    booking_appointment_link: p.booking_appointment_link, owner_title: p.owner_title,
+    instagram: p.instagram, facebook: p.facebook,
+  }
+  // UTF-8-safe base64
+  return btoa(unescape(encodeURIComponent(JSON.stringify(slim))))
+}
+
+function getPreviewUrl(p: import('../types/prospect').Prospect): string {
+  const canonical = normalizeCategory(p.category)
   const base = TEMPLATE_URLS[canonical] ?? 'https://client-site-template.pages.dev'
-  return `${base}?prospect=${placeId}`
+  return `${base}?pd=${encodeProspectForUrl(p)}`
 }
 
 export function ProspectDetail() {
@@ -44,7 +58,7 @@ export function ProspectDetail() {
 
   const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(p.address)}`
   const callUrl = `tel:${p.phone.replace(/\D/g, '')}`
-  const previewUrl = getPreviewUrl(p.category, p.place_id)
+  const previewUrl = getPreviewUrl(p)
 
   const stars = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating))
 
