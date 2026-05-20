@@ -2,7 +2,22 @@ import { useState, useCallback } from 'react'
 import { useStore } from '../lib/store'
 import { markVisited, getVisit } from '../lib/store'
 import type { Outcome } from '../lib/store'
-import { formatPhone, getTodayKey } from '../lib/utils'
+import { formatPhone, getTodayKey, normalizeCategory } from '../lib/utils'
+
+const TEMPLATE_URLS: Record<string, string> = {
+  'Pet groomer':    'https://client-site-template.pages.dev',
+  'Nail salon':     'https://nail-salon-template.pages.dev',
+  'Barber shop':    'https://barberkit-pro.pages.dev',
+  'Beauty salon':   'https://salon-pro-template.pages.dev',
+  'Attorney':       'https://attorney-web-presence.pages.dev',
+  'Dentist':        'https://dentist-web-presence.pages.dev',
+}
+
+function getPreviewUrl(category: string, placeId: string): string {
+  const canonical = normalizeCategory(category)
+  const base = TEMPLATE_URLS[canonical] ?? 'https://client-site-template.pages.dev'
+  return `${base}?prospect=${placeId}`
+}
 
 export function ProspectDetail() {
   const { selectedProspect: p, setSelectedProspect } = useStore()
@@ -29,7 +44,7 @@ export function ProspectDetail() {
 
   const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(p.address)}`
   const callUrl = `tel:${p.phone.replace(/\D/g, '')}`
-  const previewUrl = `http://localhost:3000/?prospect=${p.place_id}`
+  const previewUrl = getPreviewUrl(p.category, p.place_id)
 
   const stars = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating))
 

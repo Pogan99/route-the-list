@@ -63,23 +63,33 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
       const color = categoryColor(prospect.category)
       const isSelected = selectedProspect?.place_id === prospect.place_id
 
+      const size = isSelected ? '20px' : '14px'
       el.style.cssText = `
-        width: ${isSelected ? '20px' : '14px'};
-        height: ${isSelected ? '20px' : '14px'};
+        width: ${size};
+        height: ${size};
         border-radius: 50%;
         background-color: ${color};
         border: ${isSelected ? '3px solid white' : '2px solid rgba(0,0,0,0.3)'};
         cursor: pointer;
         box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-        transition: all 0.15s ease;
+        transition: box-shadow 0.15s ease, border-color 0.15s ease;
+        position: relative;
+        z-index: 1;
       `
+      el.title = prospect.name
 
+      // Use box-shadow glow on hover instead of transform scale.
+      // transform: scale() shrinks the CSS hit-area, causing a flicker loop
+      // where mouseenter → scale → cursor exits hit-area → mouseleave → repeat.
       el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.3)'
-        el.title = prospect.name
+        el.style.boxShadow = `0 0 0 4px ${color}55, 0 2px 8px rgba(0,0,0,0.6)`
+        el.style.borderColor = 'white'
+        el.style.zIndex = '10'
       })
       el.addEventListener('mouseleave', () => {
-        el.style.transform = 'scale(1)'
+        el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.5)'
+        el.style.borderColor = isSelected ? 'white' : 'rgba(0,0,0,0.3)'
+        el.style.zIndex = '1'
       })
 
       el.addEventListener('click', (e) => {
