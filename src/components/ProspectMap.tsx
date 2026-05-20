@@ -106,8 +106,8 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
   }, [selectedProspect, mapRef])
 
   return (
-    <div className="flex-1 relative">
-      <div ref={mapContainer} className="w-full h-full" />
+    <div className="absolute inset-0">
+      <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
       {filtered.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-zinc-900/80 text-zinc-300 text-sm px-4 py-2 rounded">

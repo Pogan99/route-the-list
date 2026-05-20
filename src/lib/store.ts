@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { Prospect } from '../types/prospect'
-import { normalizeCategory } from './utils'
+import { normalizeCategory, CATEGORY_COLORS } from './utils'
+
+const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS)
 
 export interface Filters {
   categories: string[]
@@ -71,7 +73,7 @@ export const useStore = create<AppState>((set) => ({
   selectedProspect: null,
   activeRoute: [],
   filters: {
-    categories: [],
+    categories: [...ALL_CATEGORIES],
     hideHasWebsite: true,
     cities: [],
     postalCodes: [],
@@ -88,7 +90,7 @@ export const useStore = create<AppState>((set) => ({
 export function useFilteredProspects(): Prospect[] {
   const { prospects, filters } = useStore()
   return prospects.filter((p) => {
-    if (filters.categories.length > 0 && !filters.categories.includes(normalizeCategory(p.category))) return false
+    if (!filters.categories.includes(normalizeCategory(p.category))) return false
     if (filters.hideHasWebsite && p.website) return false
     if (filters.cities.length > 0 && !filters.cities.includes(p.city)) return false
     if (filters.postalCodes.length > 0 && !filters.postalCodes.includes(p.postal_code)) return false
