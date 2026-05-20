@@ -1,3 +1,10 @@
+## Deploy route-the-list (the sales tool)
+1. Push to main → GitHub Actions auto-deploys to Cloudflare Pages.
+2. OR: `bun run build && bun run deploy` (manual deploy, requires wrangler logged in).
+3. Set secrets in GitHub repo settings: CF_API_TOKEN, CF_ACCOUNT_ID.
+
+---
+
 # Runbook — On-the-Spot Deploy Flow
 
 When a prospect says "yes," go live in under 15 minutes:
