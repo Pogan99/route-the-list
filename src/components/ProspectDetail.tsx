@@ -5,12 +5,12 @@ import type { Outcome } from '../lib/store'
 import { formatPhone, getTodayKey, normalizeCategory } from '../lib/utils'
 
 const TEMPLATE_URLS: Record<string, string> = {
-  'Pet groomer':    'https://client-site-template.pages.dev',
-  'Nail salon':     'https://nail-salon-template.pages.dev',
-  'Barber shop':    'https://barberkit-pro.pages.dev',
-  'Beauty salon':   'https://salon-pro-template.pages.dev',
-  'Attorney':       'https://attorney-web-presence.pages.dev',
-  'Dentist':        'https://dentist-web-presence.pages.dev',
+  'Pet groomer':    'https://client-site-template.pogan-93.workers.dev',
+  'Nail salon':     'https://nail-salon-template.pogan-93.workers.dev',
+  'Barber shop':    'https://barberkit-pro.pogan-93.workers.dev',
+  'Beauty salon':   'https://salon-pro-template.pogan-93.workers.dev',
+  'Attorney':       'https://attorney-web-presence.pogan-93.workers.dev',
+  'Dentist':        'https://dentist-web-presence.pogan-93.workers.dev',
 }
 
 function getPreviewUrl(category: string, placeId: string): string {
