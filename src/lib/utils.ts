@@ -30,9 +30,25 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Dentist': '#22c55e',
 }
 
-export function categoryColor(category: string): string {
-  for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
-    if (category.toLowerCase().includes(key.toLowerCase())) return color
+// Map raw Outscraper categories → canonical filter buckets
+const CATEGORY_ALIASES: Array<{ patterns: string[]; canonical: string }> = [
+  { patterns: ['attorney', 'lawyer', 'law firm', 'legal service', 'legal aid', 'paralegal', 'divorce', 'bankruptcy', 'injury', 'trial attorney', 'civil law', 'criminal justice', 'estate planning', 'immigration attorney', 'tax attorney', 'real estate attorney', 'notary'], canonical: 'Attorney' },
+  { patterns: ['dentist', 'dental', 'orthodont', 'endodont', 'prosthodont', 'oral surgeon', 'periodont', 'teeth whitening', 'dental hygienist'], canonical: 'Dentist' },
+  { patterns: ['nail salon', 'nail spa', 'manicure', 'pedicure', 'nails', 'tiệm chăm sóc móng', 'salón de manicura'], canonical: 'Nail salon' },
+  { patterns: ['pet groomer', 'pet grooming', 'dog groomer', 'dog grooming', 'cat grooming', 'peluquero de mascotas', 'peluquería'], canonical: 'Pet groomer' },
+  { patterns: ['barber'], canonical: 'Barber shop' },
+  { patterns: ['beauty salon', 'hair salon', 'hair studio', 'beauty studio', 'hair stylist', 'centro de estética'], canonical: 'Beauty salon' },
+]
+
+export function normalizeCategory(raw: string): string {
+  const lower = raw.toLowerCase()
+  for (const { patterns, canonical } of CATEGORY_ALIASES) {
+    if (patterns.some(p => lower.includes(p))) return canonical
   }
-  return '#6b7280'
+  return raw
+}
+
+export function categoryColor(category: string): string {
+  const canonical = normalizeCategory(category)
+  return CATEGORY_COLORS[canonical] ?? '#6b7280'
 }
