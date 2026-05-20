@@ -1,24 +1,45 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import { useStore, useFilteredProspects } from '../lib/store'
-import { categoryColor } from '../lib/utils'
+import { CATEGORY_COLORS, normalizeCategory } from '../lib/utils'
 import type { Prospect } from '../types/prospect'
 
-// Jacksonville, FL center
 const JAX_CENTER: [number, number] = [-81.655, 30.332]
+
+const SOURCE_ID = 'prospects'
+const CIRCLE_LAYER = 'prospect-circles'
+const SELECTED_LAYER = 'prospect-selected'
 
 interface ProspectMapProps {
   mapRef: React.MutableRefObject<maplibregl.Map | null>
 }
 
+function prospectsToGeoJSON(
+  prospects: Prospect[],
+  selectedId: string | null,
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: prospects.map(p => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      properties: {
+        place_id: p.place_id,
+        name: p.name,
+        category: p.category,
+        color: CATEGORY_COLORS[normalizeCategory(p.category)] ?? '#6b7280',
+        selected: p.place_id === selectedId ? 1 : 0,
+      },
+    })),
+  }
+}
+
 export function ProspectMap({ mapRef }: ProspectMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const markersRef = useRef<maplibregl.Marker[]>([])
-  const [mapReady, setMapReady] = useState(false)
   const filtered = useFilteredProspects()
-  const { setSelectedProspect, selectedProspect } = useStore()
+  const { setSelectedProspect, selectedProspect, prospects } = useStore()
 
-  // Init map once
+  // Map init — runs once
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
@@ -43,71 +64,120 @@ export function ProspectMap({ mapRef }: ProspectMapProps) {
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
-    map.once('load', () => setMapReady(true))
+
+    map.on('load', () => {
+      // Add GeoJSON source (empty initially)
+      map.addSource(SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+
+      // All circles
+      map.addLayer({
+        id: CIRCLE_LAYER,
+        type: 'circle',
+        source: SOURCE_ID,
+        filter: ['==', ['get', 'selected'], 0],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': ['get', 'color'],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': 'rgba(0,0,0,0.35)',
+          'circle-opacity': 0.9,
+        },
+      })
+
+      // Selected circle — larger ring on top
+      map.addLayer({
+        id: SELECTED_LAYER,
+        type: 'circle',
+        source: SOURCE_ID,
+        filter: ['==', ['get', 'selected'], 1],
+        paint: {
+          'circle-radius': 11,
+          'circle-color': ['get', 'color'],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 1,
+        },
+      })
+
+      // Cursor + tooltip
+      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 })
+
+      map.on('mouseenter', CIRCLE_LAYER, (e) => {
+        map.getCanvas().style.cursor = 'pointer'
+        const f = e.features?.[0]
+        if (f) {
+          popup.setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
+            .setHTML(`<span style="font-size:12px;font-weight:600">${f.properties?.name}</span>`)
+            .addTo(map)
+        }
+      })
+      map.on('mouseleave', CIRCLE_LAYER, () => {
+        map.getCanvas().style.cursor = ''
+        popup.remove()
+      })
+      map.on('mouseenter', SELECTED_LAYER, (e) => {
+        map.getCanvas().style.cursor = 'pointer'
+        const f = e.features?.[0]
+        if (f) {
+          popup.setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
+            .setHTML(`<span style="font-size:12px;font-weight:600">${f.properties?.name}</span>`)
+            .addTo(map)
+        }
+      })
+      map.on('mouseleave', SELECTED_LAYER, () => {
+        map.getCanvas().style.cursor = ''
+        popup.remove()
+      })
+
+      // Click to select
+      map.on('click', CIRCLE_LAYER, (e) => {
+        const placeId = e.features?.[0]?.properties?.place_id
+        if (!placeId) return
+        // Access store directly via the stable ref pattern
+        const p = (map as unknown as { _prospects?: Prospect[] })._prospects?.find(x => x.place_id === placeId)
+        if (p) setSelectedProspect(p)
+      })
+      map.on('click', SELECTED_LAYER, (e) => {
+        const placeId = e.features?.[0]?.properties?.place_id
+        if (!placeId) return
+        const p = (map as unknown as { _prospects?: Prospect[] })._prospects?.find(x => x.place_id === placeId)
+        if (p) setSelectedProspect(p)
+      })
+    })
 
     return () => {
       map.remove()
       mapRef.current = null
-      setMapReady(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update markers when filtered prospects or selection changes (only after map is ready)
+  // Keep a lookup table on the map instance so click handlers can find prospects
+  useEffect(() => {
+    if (!mapRef.current) return
+    ;(mapRef.current as unknown as { _prospects?: Prospect[] })._prospects = prospects
+  }, [prospects, mapRef])
+
+  // Update GeoJSON when filtered prospects or selection changes
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !mapReady) return
+    if (!map) return
 
-    // Remove existing markers
-    markersRef.current.forEach(m => m.remove())
-    markersRef.current = []
+    const update = () => {
+      const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+      if (!src) return
+      src.setData(prospectsToGeoJSON(filtered, selectedProspect?.place_id ?? null))
+    }
 
-    filtered.forEach((prospect: Prospect) => {
-      const el = document.createElement('div')
-      const color = categoryColor(prospect.category)
-      const isSelected = selectedProspect?.place_id === prospect.place_id
-
-      const size = isSelected ? '20px' : '14px'
-      el.style.cssText = `
-        width: ${size};
-        height: ${size};
-        border-radius: 50%;
-        background-color: ${color};
-        border: ${isSelected ? '3px solid white' : '2px solid rgba(0,0,0,0.3)'};
-        cursor: pointer;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-        transition: box-shadow 0.15s ease, border-color 0.15s ease;
-        position: relative;
-        z-index: 1;
-      `
-      el.title = prospect.name
-
-      // Use box-shadow glow on hover instead of transform scale.
-      // transform: scale() shrinks the CSS hit-area, causing a flicker loop
-      // where mouseenter → scale → cursor exits hit-area → mouseleave → repeat.
-      el.addEventListener('mouseenter', () => {
-        el.style.boxShadow = `0 0 0 4px ${color}55, 0 2px 8px rgba(0,0,0,0.6)`
-        el.style.borderColor = 'white'
-        el.style.zIndex = '10'
-      })
-      el.addEventListener('mouseleave', () => {
-        el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.5)'
-        el.style.borderColor = isSelected ? 'white' : 'rgba(0,0,0,0.3)'
-        el.style.zIndex = '1'
-      })
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        setSelectedProspect(prospect)
-      })
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([prospect.lng, prospect.lat])
-        .addTo(map)
-
-      markersRef.current.push(marker)
-    })
-  }, [filtered, selectedProspect, setSelectedProspect, mapRef, mapReady])
+    if (map.isStyleLoaded()) {
+      update()
+    } else {
+      map.once('load', update)
+    }
+  }, [filtered, selectedProspect, mapRef])
 
   // Fly to selected prospect
   useEffect(() => {
