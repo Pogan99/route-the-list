@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useStore } from '../lib/store'
+import { markVisited, getVisit } from '../lib/store'
+import type { Outcome } from '../lib/store'
 import { formatPhone, getTodayKey } from '../lib/utils'
 
 export function ProspectDetail() {
   const { selectedProspect: p, setSelectedProspect } = useStore()
   const [photoIdx, setPhotoIdx] = useState(0)
+  const [, forceUpdate] = useState(0)
+
+  const handleOutcome = useCallback((outcome: Outcome) => {
+    if (!p) return
+    markVisited(p.place_id, outcome)
+    forceUpdate(n => n + 1)
+  }, [p])
 
   if (!p) {
     return (
@@ -14,6 +23,7 @@ export function ProspectDetail() {
     )
   }
 
+  const visit = getVisit(p.place_id)
   const todayKey = getTodayKey()
   const todayHours = p.working_hours[todayKey] ?? p.working_hours[todayKey.slice(0, 3)] ?? 'Unknown'
 
@@ -184,6 +194,32 @@ export function ProspectDetail() {
             View existing booking page
           </a>
         )}
+
+        {/* Status buttons */}
+        <div>
+          <p className="text-zinc-500 text-xs uppercase tracking-wide mb-2">Visit outcome</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {([
+              { key: 'interested', label: 'Interested ✓', active: 'bg-emerald-700 border-emerald-600 text-emerald-100', inactive: 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-emerald-700 hover:text-emerald-400' },
+              { key: 'closed', label: 'Closed Deal ★', active: 'bg-yellow-700 border-yellow-600 text-yellow-100', inactive: 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-yellow-600 hover:text-yellow-400' },
+              { key: 'not_now', label: 'Not Now', active: 'bg-zinc-600 border-zinc-500 text-zinc-100', inactive: 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300' },
+              { key: 'no_answer', label: 'No Answer', active: 'bg-zinc-700 border-zinc-600 text-zinc-300', inactive: 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400' },
+            ] as { key: Outcome; label: string; active: string; inactive: string }[]).map(({ key, label, active, inactive }) => (
+              <button
+                key={key}
+                onClick={() => handleOutcome(key)}
+                className={`text-xs border rounded px-2 py-1.5 transition-colors text-center ${visit?.outcome === key ? active : inactive}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {visit && (
+            <p className="text-zinc-600 text-xs mt-1">
+              Visited {new Date(visit.visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
 
         {/* Preview button */}
         <a

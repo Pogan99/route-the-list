@@ -7,9 +7,12 @@ import type { Prospect } from '../types/prospect'
 // Jacksonville, FL center
 const JAX_CENTER: [number, number] = [-81.655, 30.332]
 
-export function ProspectMap() {
+interface ProspectMapProps {
+  mapRef: React.MutableRefObject<maplibregl.Map | null>
+}
+
+export function ProspectMap({ mapRef }: ProspectMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const filtered = useFilteredProspects()
   const { setSelectedProspect, selectedProspect } = useStore()
@@ -43,6 +46,7 @@ export function ProspectMap() {
       mapRef.current?.remove()
       mapRef.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update markers when filtered prospects change
@@ -89,7 +93,7 @@ export function ProspectMap() {
 
       markersRef.current.push(marker)
     })
-  }, [filtered, selectedProspect, setSelectedProspect])
+  }, [filtered, selectedProspect, setSelectedProspect, mapRef])
 
   // Fly to selected prospect
   useEffect(() => {
@@ -99,7 +103,7 @@ export function ProspectMap() {
       zoom: 15,
       duration: 600,
     })
-  }, [selectedProspect])
+  }, [selectedProspect, mapRef])
 
   return (
     <div className="flex-1 relative">
